@@ -1,23 +1,91 @@
+
+// Three.js setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Kamera pozisyonu
-camera.position.z = 700; // Dünyadan biraz uzaklaştır
+// Set camera position
+camera.position.set(0, 0, 700); // X, Y, Z konumunu ayarla
+camera.lookAt(0, 0, 0); // Kamerayı modelin merkezine odakla
 
-const dataMonitor = document.getElementById('data-monitor'); // Veri monitörü
-const progressBar = document.getElementById('progress-bar'); // İlerleme çubuğu
-const loadingMessage = document.getElementById('loading-message'); // Yükleme sonucunu göstermek için
-const processingMonitor = document.getElementById('processing-monitor'); // İşleme monitörü
-const dataOutput = document.getElementById('data-output'); // Koordinatları gösterecek monitör
+// 3D sahneye ışık ekleyin
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Ortam ışığı
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Beyaz ışık
+directionalLight.position.set(1, 1, 1).normalize();
+scene.add(directionalLight);
+
+
+// DOM elements
+const dataMonitor = document.getElementById('data-monitor'); // Data monitor
+const progressBar = document.getElementById('progress-bar'); // Progress bar
+const loadingMessage = document.getElementById('loading-message'); // Loading message display
+const processingMonitor = document.getElementById('processing-monitor'); // Processing monitor
+const dataOutput = document.getElementById('data-output'); // To display coordinates
+
+// GLTF Loader
+const loader = new THREE.GLTFLoader();
+
+function addDebugCube() {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(0, 0, 0); // Ortaya yerleştir
+    scene.add(cube);
+}
+
+
+
+let earth; // Global değişken olarak Dünya modelini saklayacağız
+
+async function load3DModel() {
+    return new Promise((resolve, reject) => {
+        loader.load('/static/models/earth.glb', (gltf) => {
+            console.log('Model yüklendi:', gltf);
+            scene.add(gltf.scene);
+
+            // Modelin boyutunu al
+            const box = new THREE.Box3().setFromObject(gltf.scene);
+            const center = box.getCenter(new THREE.Vector3());
+
+            camera.lookAt(center);
+
+            // Dünya modelini eksen eğikliği ile döndür
+            gltf.scene.rotation.x = THREE.MathUtils.degToRad(23.5); // 23.5 derece eğiklik
+
+            // Başarılı yükleme bildirimi
+            const notification = document.createElement('div');
+            notification.innerText = 'Dünya modeli başarıyla yüklendi!';
+            notification.style.position = 'absolute';
+            notification.style.top = '10px';
+            notification.style.left = '10px';
+            notification.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+            notification.style.color = '#fff';
+            notification.style.padding = '10px';
+            notification.style.borderRadius = '5px';
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
+
+            resolve();
+        }, undefined, (error) => {
+            console.error('Error loading model:', error);
+            reject(error);
+        });
+    });
+}
+
 
 async function loadOEMFiles(filePaths) {
     const allPositions = [];
     const totalFiles = filePaths.length;
 
-    // Göster Loading
+    // Show loading
     document.getElementById('loading').style.display = 'block';
 
     for (let i = 0; i < totalFiles; i++) {
@@ -26,8 +94,8 @@ async function loadOEMFiles(filePaths) {
             const response = await fetch(filePath);
             const text = await response.text();
             console.log(`Loaded file: ${filePath}\nContent:\n${text}`);  // Log file content for debugging
-            
-            // Yükleme logunu güncelle
+
+            // Update loading log
             dataMonitor.innerText = `Loading ${filePath}...`;
 
             const positions = parseOEMData(text);
@@ -35,12 +103,12 @@ async function loadOEMFiles(filePaths) {
             if (positions && positions.length > 0) {
                 allPositions.push(...positions);
                 console.log(`${filePath}: ${positions.length} positions found`);
-                dataMonitor.innerText = `Loaded ${positions.length} positions from ${filePath}`; // Güncelle
+                dataMonitor.innerText = `Loaded ${positions.length} positions from ${filePath}`; // Update
 
-                // İşleme monitörünü güncelle
-                processingMonitor.innerText += `\nProcessed ${positions.length} positions from ${filePath}`; 
+                // Update processing monitor
+                processingMonitor.innerText += `\nProcessed ${positions.length} positions from ${filePath}`;
 
-                // Koordinatları güncelle
+                // Update coordinates
                 updateDataOutput(positions);
             } else {
                 console.warn(`${filePath}: No valid positions found`);
@@ -51,32 +119,32 @@ async function loadOEMFiles(filePaths) {
             dataMonitor.innerText += `\nFailed to load ${filePath}: ${error.message}`;
         }
 
-        // Progress bar update
+        // Update progress bar
         const progressPercentage = ((i + 1) / totalFiles) * 100;
         progressBar.style.width = `${progressPercentage}%`;
     }
 
-    // Yükleme tamamlandığında loading mesajını gizle
+    // Hide loading when complete
     document.getElementById('loading').style.display = 'none';
 
-    // Yükleme sonucunu göster
-    loadingMessage.innerText = `${totalFiles} files loaded successfully!`; 
+    // Show loading result
+    loadingMessage.innerText = `${totalFiles} files loaded successfully!`;
 
     return allPositions;
 }
 
 function updateDataOutput(positions) {
-    // Son üç pozisyonu gösterecek şekilde güncelle
-    const lastPositions = positions.slice(-3); // Son 3 pozisyon
-    dataOutput.innerHTML = 'Processed Coordinates:<br>'; // Başlangıç mesajı
+    // Display last three positions
+    const lastPositions = positions.slice(-3); // Last 3 positions
+    dataOutput.innerHTML = 'Processed Coordinates:<br>'; // Initial message
 
     lastPositions.forEach(pos => {
-        // pos nesnesinin yapısını kontrol et
+        // Check structure of pos object
         if (pos && typeof pos.position === 'object' && pos.position.length >= 3) {
-            // Eğer pos bir nesne ise ve position değerini al
+            // If pos is an object, get position value
             dataOutput.innerHTML += `X: ${pos.position[0].toFixed(2)}, Y: ${pos.position[1].toFixed(2)}, Z: ${pos.position[2].toFixed(2)}<br>`;
         } else if (Array.isArray(pos) && pos.length >= 3) {
-            // Eğer pos bir dizi ise, x, y, z değerlerini al
+            // If pos is an array, get x, y, z values
             dataOutput.innerHTML += `X: ${pos[0].toFixed(2)}, Y: ${pos[1].toFixed(2)}, Z: ${pos[2].toFixed(2)}<br>`;
         } else {
             console.warn('Invalid position data:', pos);
@@ -85,35 +153,34 @@ function updateDataOutput(positions) {
     });
 }
 
-
 function parseOEMData(data) {
     const lines = data.split('\n');
-    const positions = []; // Pozisyonları saklamak için bir dizi
-    let readCovariance = true; // COVARIANCE_START kontrolü
+    const positions = []; // Array to store positions
+    let readCovariance = true; // COVARIANCE_START control
 
     for (const line of lines) {
         const trimmedLine = line.trim();
 
-        // Boş satırları atla
+        // Skip empty lines
         if (trimmedLine === '') {
             continue;
         }
 
-        // COVARIANCE_START kontrolü
+        // COVARIANCE_START check
         if (trimmedLine === 'COVARIANCE_START') {
-            readCovariance = false; // Covariance okumayı durdur
-            continue; // COVARIANCE_START'ı atla
+            readCovariance = false; // Stop reading covariance
+            continue; // Skip COVARIANCE_START
         }
 
-        // Eğer covariance okunuyorsa, işlemeye devam et
+        // Continue if covariance is being read
         if (!readCovariance) {
-            continue; // COVARIANCE_START'tan sonraki satırları atla
+            continue; // Skip lines after COVARIANCE_START
         }
 
-        // Veri satırlarını kontrol et
-        const parts = trimmedLine.split(/\s+/); // Boşluklarla ayır
+        // Check data lines
+        const parts = trimmedLine.split(/\s+/); // Split by whitespace
         if (parts.length >= 7) {
-            const epoch = parts[0]; // Zaman damgası
+            const epoch = parts[0]; // Timestamp
             const position = [
                 parseFloat(parts[1]), // X
                 parseFloat(parts[2]), // Y
@@ -125,65 +192,80 @@ function parseOEMData(data) {
                 parseFloat(parts[6])  // Vz
             ];
 
-            // NaN kontrolü
+            // NaN check
             if (!position.includes(NaN) && !velocity.includes(NaN)) {
-                positions.push({ epoch, position, velocity }); // Pozisyon ve zaman damgasını saklayın
-                console.log("Parsed position:", { epoch, position, velocity }); // Parse edilen veriyi logla
+                positions.push({ epoch, position, velocity }); // Store position and timestamp
+                console.log("Parsed position:", { epoch, position, velocity }); // Log parsed data
             } else {
                 console.error("Invalid position or velocity data found:", position, velocity);
             }
         } else {
-            console.log("Ignoring line (not enough parts):", trimmedLine); // Ignored satırları logla
+            console.log("Ignoring line (not enough parts):", trimmedLine); // Log ignored lines
         }
     }
 
-    console.log('Parsed positions:', positions); // Pozisyonları kontrol et
-    return positions; // Pozisyonları döndür
+    console.log('Parsed positions:', positions); // Check positions
+    return positions; // Return positions
 }
 
-
 async function init() {
-    const loadingElement = document.getElementById('loading'); // Yükleme mesajı için bir DOM öğesi
-    loadingElement.style.display = 'block'; // Yükleme mesajını göster
+    const loadingElement = document.getElementById('loading'); // Loading message DOM element
+    loadingElement.style.display = 'block'; // Show loading message
 
     const filePaths = await fetch('/api/oem-files')
         .then(response => response.json())
         .then(files => files.map(file => `/static/oem_files/${file}`));
 
-    const positions = await loadOEMFiles(filePaths); // Dosyaları yükle
+    const positions = await loadOEMFiles(filePaths); // Load files
 
-    // Yükleme tamamlandığında
-    loadingElement.style.display = 'none'; // Yükleme mesajını gizle
+    // Load the 3D model after loading OEM files
+    await load3DModel();
 
-    // Yörüngeyi oluşturma ve render işlemlerini burada yapın
+    // When loading is complete
+    loadingElement.style.display = 'none'; // Hide loading message
+
+    // Create orbit and rendering here
     createOrbit(positions);
 }
+
+
 function createOrbit(positions) {
     const geometry = new THREE.BufferGeometry();
     const vertices = [];
 
-    // Pozisyonları vertex dizisine ekle
+    // Add positions to vertex array
     for (const { position } of positions) {
-        vertices.push(...position); // X, Y, Z değerlerini ekle
+        vertices.push(...position); // Add X, Y, Z values
     }
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
-    // Nokta materyali oluştur
+    // Create point material
     const material = new THREE.PointsMaterial({ color: 0xff0000, size: 1 });
     const points = new THREE.Points(geometry, material);
 
-    // Sahneye noktaları ekle
+    // Add points to scene
     scene.add(points);
 
-    // Render işlemi
+    // Render the scene
     animate();
 }
 
+
+
+// Call init function
+init();
+
+
 function animate() {
     requestAnimationFrame(animate);
+
+    // Doğru modelin döndürülmesi
+    scene.traverse((child) => {
+        if (child.isMesh && child.name === 'Earth') { // Modelin adını kontrol et
+            child.rotation.y += 0.01; // Y ekseninde döndür
+        }
+    });
+
     renderer.render(scene, camera);
 }
-
-// Init fonksiyonunu çağır
-init();

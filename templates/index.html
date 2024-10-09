@@ -47,11 +47,13 @@
             top: 0;
             left: 0;
             z-index: 1000;
-            width: 100%; /* Progress bar'ı genişlik olarak tüm ekranı kaplaması için ayarladık */
+            width: 100%;
+            /* Progress bar'ı genişlik olarak tüm ekranı kaplaması için ayarladık */
         }
 
         #progress-bar {
-            height: 20px; /* Bar yüksekliğini belirledik */
+            height: 20px;
+            /* Bar yüksekliğini belirledik */
             background-color: #4caf50;
             width: 0%;
             transition: width 0.2s;
@@ -59,7 +61,8 @@
 
         #processing-monitor {
             position: absolute;
-            top: 220px; /* İkinci monitör için bir konum belirliyoruz */
+            top: 220px;
+            /* İkinci monitör için bir konum belirliyoruz */
             left: 10px;
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
@@ -74,7 +77,8 @@
 
         #data-output {
             position: absolute;
-            top: 440px; /* Üçüncü monitör için bir konum belirliyoruz */
+            top: 440px;
+            /* Üçüncü monitör için bir konum belirliyoruz */
             left: 10px;
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
@@ -99,8 +103,12 @@
     <div id="data-monitor">Loading data...</div>
     <div id="processing-monitor">Processing data...</div>
     <div id="data-output">Processed Coordinates:</div> <!-- Yeni monitör eklendi -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.138.3/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.138.3/examples/js/loaders/GLTFLoader.min.js"></script>
+    
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Your script -->
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 
