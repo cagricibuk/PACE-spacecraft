@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PACE Orbit Visualization</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #data-monitor {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            max-width: 600px;
+            overflow-y: auto;
+            max-height: 200px;
+            z-index: 10;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 20;
+        }
+
+        #progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            width: 100%; /* Progress bar'ı genişlik olarak tüm ekranı kaplaması için ayarladık */
+        }
+
+        #progress-bar {
+            height: 20px; /* Bar yüksekliğini belirledik */
+            background-color: #4caf50;
+            width: 0%;
+            transition: width 0.2s;
+        }
+
+        #processing-monitor {
+            position: absolute;
+            top: 220px; /* İkinci monitör için bir konum belirliyoruz */
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            max-width: 600px;
+            overflow-y: auto;
+            max-height: 200px;
+            z-index: 10;
+        }
+
+        #data-output {
+            position: absolute;
+            top: 440px; /* Üçüncü monitör için bir konum belirliyoruz */
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            max-width: 600px;
+            overflow-y: auto;
+            max-height: 200px;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" style="display: none;">
+        <div id="loading-message">Loading...</div>
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+    <div id="data-monitor">Loading data...</div>
+    <div id="processing-monitor">Processing data...</div>
+    <div id="data-output">Processed Coordinates:</div> <!-- Yeni monitör eklendi -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+
+</html>
