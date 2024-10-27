@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pace Satellite Simulation</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #debugInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            white-space: pre-wrap; /* Çoklu satır için */
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="debugInfo">Yörünge bilgisi yükleniyor...</div>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Işık ekleyin
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 10, 10).normalize();
+        scene.add(light);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        // OrbitControls ekleyin
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.screenSpacePanning = false;
+
+        camera.position.set(0, 0, 800);
+
+        let satelliteTrailGeometry = new THREE.BufferGeometry(); // İz için geometri
+        let satelliteTrailMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+        let satelliteTrailLine = new THREE.Line(satelliteTrailGeometry, satelliteTrailMaterial);
+        scene.add(satelliteTrailLine);
+
+        function loadData() {
+            fetch('processed_telemetry.json') // JSON dosyanızın yolu
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP hatası: ${response.status} - ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    updateDebugInfo("Yörünge bilgisi yüklendi.");
+                    loadModels(data); // Modelleri yükle
+                })
+                .catch(error => {
+                    console.error('JSON yüklenirken hata:', error);
+                    updateDebugInfo(`JSON yüklenirken hata oluştu: ${error.message}`);
+                });
+        }
+
+        function loadModels(data) {
+            const loader = new THREE.GLTFLoader();
+
+            // Dünya modelini yükleyin
+            loader.load('static/models/earth.glb', (gltf) => {
+                const earth = gltf.scene;
+                earth.scale.set(0.6, 0.6, 0.6); // Ölçeği küçülttük
+                earth.position.set(0, 0, 0);
+                scene.add(earth);
+                updateDebugInfo("Model Yüklendi: Earth");
+                
+                // Uydu modelini yükleyin
+                loader.load('static/models/PACE.glb', (gltf) => {
+                    const satellite = gltf.scene;
+                    satellite.scale.set(50, 50, 50); // Uydu modelinin ölçeğini ayarlayın
+                    satellite.position.set(0, 0, 0); // Başlangıçta dünya ile aynı konumda
+                    scene.add(satellite);
+                    updateDebugInfo("Model Yüklendi: Satellite");
+
+                    // Uydu konumlarını güncelleme
+                    updateSatellitePositions(data, satellite);
+                });
+            });
+        }
+
+        function updateSatellitePositions(data, satellite) {
+            const trailPositions = [];
+
+            let currentIndex = 0;
+            const updateInterval = setInterval(() => {
+                if (currentIndex < data.length) {
+                    const position = data[currentIndex].position;
+                    satellite.position.set(position[0] * 0.1, position[1] * 0.1, position[2] * 0.1);
+                    
+                    // İz için konumları ekle
+                    trailPositions.push(new THREE.Vector3(position[0] * 0.1, position[1] * 0.1, position[2] * 0.1));
+                    
+                    // Yörüngeyi güncelle
+                    satelliteTrailGeometry.setFromPoints(trailPositions);
+
+                    currentIndex++;
+                } else {
+                    clearInterval(updateInterval);
+                }
+            }, 80);
+        }
+
+        const animate = function () {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        };
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function updateDebugInfo(message) {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.innerText += `\n${message}`;
+        }
+
+        loadData(); // Veriyi yükle
+    </script>
+</body>
+</html>
