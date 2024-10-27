@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pace Satellite Simulation</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
         #debugInfo {
             position: absolute;
             top: 10px;
@@ -16,15 +23,33 @@
             padding: 5px;
             border-radius: 5px;
             font-family: Arial, sans-serif;
-            white-space: pre-wrap; /* Çoklu satır için */
+            white-space: pre-wrap;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            font-family: Arial, sans-serif;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
     <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://unpkg.com/three@0.126.0/examples/js/controls/OrbitControls.js"></script>
 </head>
+
 <body>
     <div id="debugInfo">Yörünge bilgisi yükleniyor...</div>
+    <div id="controls">
+        <button onclick="setTimeMultiplier(1)">1x</button>
+        <button onclick="setTimeMultiplier(5)">5x</button>
+        <button onclick="setTimeMultiplier(10)">10x</button>
+        <div id="timestamp">Zaman Damgası: Yükleniyor...</div>
+    </div>
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
@@ -32,15 +57,13 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Işık ekleyin
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(10, 10, 10).normalize();
+        const light = new THREE.DirectionalLight(0xffffff, 3);
+        light.position.set(-10, 10, 10).normalize();
         scene.add(light);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
-        // OrbitControls ekleyin
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.25;
@@ -48,13 +71,18 @@
 
         camera.position.set(0, 0, 800);
 
-        let satelliteTrailGeometry = new THREE.BufferGeometry(); // İz için geometri
-        let satelliteTrailMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+        let satelliteTrailGeometry = new THREE.BufferGeometry();
+        let satelliteTrailMaterial = new THREE.LineBasicMaterial({ color: 0x00BFFF }); // Açık mavi renk
         let satelliteTrailLine = new THREE.Line(satelliteTrailGeometry, satelliteTrailMaterial);
         scene.add(satelliteTrailLine);
 
+        let timeMultiplier = 1; // Zaman çarpanı
+        let currentIndex = 0;
+        let dataLength = 0;
+        let positions = []; // Pozisyonları saklamak için
+
         function loadData() {
-            fetch('processed_telemetry.json') // JSON dosyanızın yolu
+            fetch('processed_telemetry.json')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP hatası: ${response.status} - ${response.statusText}`);
@@ -63,7 +91,8 @@
                 })
                 .then(data => {
                     updateDebugInfo("Yörünge bilgisi yüklendi.");
-                    loadModels(data); // Modelleri yükle
+                    dataLength = data.length; // Veri uzunluğunu kaydet
+                    loadModels(data);
                 })
                 .catch(error => {
                     console.error('JSON yüklenirken hata:', error);
@@ -73,49 +102,81 @@
 
         function loadModels(data) {
             const loader = new THREE.GLTFLoader();
-
-            // Dünya modelini yükleyin
             loader.load('static/models/earth.glb', (gltf) => {
                 const earth = gltf.scene;
-                earth.scale.set(0.6, 0.6, 0.6); // Ölçeği küçülttük
-                earth.position.set(0, 0, 0);
+                earth.scale.set(0.6, 0.6, 0.6);
                 scene.add(earth);
                 updateDebugInfo("Model Yüklendi: Earth");
-                
-                // Uydu modelini yükleyin
+
                 loader.load('static/models/PACE.glb', (gltf) => {
                     const satellite = gltf.scene;
-                    satellite.scale.set(50, 50, 50); // Uydu modelinin ölçeğini ayarlayın
-                    satellite.position.set(0, 0, 0); // Başlangıçta dünya ile aynı konumda
+                    satellite.scale.set(50, 50, 50);
+                    satellite.position.set(0, 0, 0);
                     scene.add(satellite);
                     updateDebugInfo("Model Yüklendi: Satellite");
-
-                    // Uydu konumlarını güncelleme
                     updateSatellitePositions(data, satellite);
                 });
             });
         }
 
-        function updateSatellitePositions(data, satellite) {
-            const trailPositions = [];
-
-            let currentIndex = 0;
-            const updateInterval = setInterval(() => {
-                if (currentIndex < data.length) {
+        async function updateSatellitePositions(data, satellite) {
+            const updatePositions = async () => {
+                while (currentIndex < data.length) {
                     const position = data[currentIndex].position;
                     satellite.position.set(position[0] * 0.1, position[1] * 0.1, position[2] * 0.1);
-                    
-                    // İz için konumları ekle
-                    trailPositions.push(new THREE.Vector3(position[0] * 0.1, position[1] * 0.1, position[2] * 0.1));
-                    
-                    // Yörüngeyi güncelle
-                    satelliteTrailGeometry.setFromPoints(trailPositions);
+                    satellite.lookAt(0, 0, 0); // Uydu her zaman Dünya'ya baksın
 
-                    currentIndex++;
-                } else {
-                    clearInterval(updateInterval);
+                    positions.push(new THREE.Vector3(position[0] * 0.1, position[1] * 0.1, position[2] * 0.1));
+                    satelliteTrailGeometry.setFromPoints(positions);
+
+                    const epochString = data[currentIndex].epoch;
+                    const epoch = new Date(epochString).getTime() / 1000;
+
+                    if (!isNaN(epoch)) {
+                        updateTimestamp(epoch);
+                    }
+
+                    currentIndex += Math.floor(timeMultiplier);
+
+                    // Burada bir süre bekleyin
+                    await sleep(100); // 250 milisaniye bekle
+
+                    for (let i = 0; i < positions.length; i++) {
+                        const point = positions[i];
+                        const alpha = (i < positions.length - 5) ? 0.1 : 1;
+                        satelliteTrailMaterial.opacity = alpha;
+                    }
                 }
-            }, 80);
+            };
+            updatePositions();
+        }
+
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function setTimeMultiplier(multiplier) {
+            timeMultiplier = multiplier; // Zaman çarpanını güncelle
+            document.getElementById('timestamp').innerText = `Zaman Damgası: Yükleniyor...`; // Zaman damgasını sıfırla
+            currentIndex = 0; // İndeksi sıfırla
+            positions = []; // Pozisyonları sıfırla
+            satelliteTrailGeometry.setFromPoints([]); // İzleri temizle
+            loadData(); // Veriyi tekrar yükle
+        }
+
+        function updateTimestamp(epoch) {
+            const date = new Date(epoch * 1000); // Epoch'u milisaniyeye çevir
+
+            // Geçersiz tarih kontrolü
+            if (isNaN(date.getTime())) {
+                console.error(`Geçersiz tarih: ${epoch}`);
+                document.getElementById('timestamp').innerText = `Zaman Damgası: Hatalı Tarih`;
+                return;
+            }
+
+            const formattedDate = date.toLocaleString(); // Yerel zaman formatında biçimlendir
+            document.getElementById('timestamp').innerText = `Zaman Damgası: ${formattedDate}`;
         }
 
         const animate = function () {
@@ -140,4 +201,5 @@
         loadData(); // Veriyi yükle
     </script>
 </body>
+
 </html>
